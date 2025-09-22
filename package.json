@@ -1,0 +1,75 @@
+{
+  "name": "ai-restaurant-assistant",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx ./index.ts",
+    "build": "pnpm run clean && pnpm run build:server",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "build:server": "esbuild index.ts --bundle --platform=node --target=node18 --format=esm --outfile=dist/index.js --external:@autonia/* --external:stripe --external:dotenv --external:express --external:pg --external:events --external:crypto --external:fs --external:path --external:os --external:util --jsx=automatic --jsx-import-source=react --minify",
+    "clean": "rimraf dist",
+    "serve": "node dist/index.js"
+  },
+  "dependencies": {
+    "@autonia/actors": "^0.1.25",
+    "@autonia/auth": "^0.1.25",
+    "@autonia/context-manager": "^0.1.25",
+    "@autonia/core": "^0.1.25",
+    "@autonia/data": "^0.1.25",
+    "@autonia/database": "^0.1.25",
+    "@autonia/mcp": "^0.1.25",
+    "@autonia/messages": "^0.1.25",
+    "@autonia/providers": "^0.1.25",
+    "@autonia/queue": "^0.1.25",
+    "@autonia/rag": "^0.1.25",
+    "@autonia/server": "^0.1.25",
+    "@autonia/stores": "^0.1.25",
+    "@autonia/thread-processors": "^0.1.25",
+    "@autonia/tools": "^0.1.25",
+    "@autonia/triggers": "^0.1.25",
+    "@autonia/types": "^0.1.25",
+    "@autonia/upload-processors": "^0.1.25",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "ora": "^9.0.0",
+    "pg": "^8.16.3",
+    "react": "^19.1.1",
+    "stripe": "^18.3.0",
+    "zod": "^4.0.14"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.10",
+    "@types/react": "^19.1.9",
+    "@typescript-eslint/eslint-plugin": "^8.21.0",
+    "@typescript-eslint/parser": "^8.21.0",
+    "cross-env": "^7.0.3",
+    "esbuild": "^0.20.0",
+    "eslint": "^9.19.0",
+    "rimraf": "^6.0.1",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=18",
+    "pnpm": ">=8",
+    "npm": ">=9"
+  },
+  "keywords": [
+    "AGX AI Agent",
+    "AI Agent Framework",
+    "Airbnb Support Agent",
+    "WhatsApp AI Bot",
+    "Stripe Payment Integration",
+    "MongoDB AI Agent"
+  ],
+  "packageManager": "pnpm@10.6.1+sha256.81204845a396962a9c4b49cc2d6cafbb49a758652d3c243f2128cbc638084fe2",
+  "pnpm": {
+    "overrides": {
+      "zod": "^4.0.14"
+    }
+  }
+}
