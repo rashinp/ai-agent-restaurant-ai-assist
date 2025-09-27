@@ -1,0 +1,70 @@
+steps:
+  # Build the Docker image with optimized caching
+  - name: "gcr.io/cloud-builders/docker"
+    env:
+      - "DOCKER_BUILDKIT=1"
+    args:
+      - "build"
+      - "--cache-from"
+      - "gcr.io/$PROJECT_ID/ai-restaurant-assistant:latest"
+      - "--build-arg"
+      - "BUILDKIT_INLINE_CACHE=1"
+      - "-t"
+      - "gcr.io/$PROJECT_ID/ai-restaurant-assistant:$BUILD_ID"
+      - "-t"
+      - "gcr.io/$PROJECT_ID/ai-restaurant-assistant:latest"
+      - "."
+
+  # Push the Docker image to Container Registry
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "gcr.io/$PROJECT_ID/ai-restaurant-assistant:$BUILD_ID"
+
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "gcr.io/$PROJECT_ID/ai-restaurant-assistant:latest"
+
+  # Deploy to Cloud Run
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: "gcloud"
+    args:
+      - "run"
+      - "deploy"
+      - "ai-restaurant-assistant"
+      - "--image"
+      - "gcr.io/$PROJECT_ID/ai-restaurant-assistant:latest"
+      - "--region"
+      - "us-central1"
+      - "--platform"
+      - "managed"
+      - "--allow-unauthenticated"
+      - "--port"
+      - "3000"
+      - "--memory"
+      - "2Gi"
+      - "--cpu"
+      - "2"
+      - "--timeout"
+      - "300"
+      - "--concurrency"
+      - "80"
+      - "--min-instances"
+      - "0"
+      - "--max-instances"
+      - "10"
+      - "--env-vars-file"
+      - ".env.yaml"
+
+# Store images in Container Registry
+images:
+  - "gcr.io/$PROJECT_ID/ai-restaurant-assistant:$BUILD_ID"
+  - "gcr.io/$PROJECT_ID/ai-restaurant-assistant:latest"
+
+# Build options
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+# Timeout for the entire build
+timeout: "1200s"

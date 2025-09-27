@@ -7,12 +7,19 @@
     "dev": "tsx ./index.ts",
     "build": "pnpm run clean && pnpm run build:server",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "build:server": "esbuild index.ts --bundle --platform=node --target=node18 --format=esm --outfile=dist/index.js --external:@autonia/* --external:stripe --external:dotenv --external:express --external:pg --external:events --external:crypto --external:fs --external:path --external:os --external:util --jsx=automatic --jsx-import-source=react --minify",
+    "build:server": "esbuild index.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/index.js --external:@autonia/* --external:stripe --external:dotenv --external:express --external:pg --external:events --external:crypto --external:fs --external:path --external:os --external:util --jsx=automatic --jsx-import-source=react --minify",
     "clean": "rimraf dist",
-    "serve": "node dist/index.js"
+    "serve": "node dist/index.js",
+    "docker:build": "docker build -t restaurant-ai-assistant .",
+    "docker:run": "docker run -p 3000:3000 restaurant-ai-assistant",
+    "deploy": "./deploy-simple.sh",
+    "deploy:help": "./deploy.sh --help",
+    "deploy:cloudbuild": "./deploy-cloudbuild.sh",
+    "deploy:docker": "./deploy.sh --project-id protean-acrobat-458913-n8",
+    "gcp:logs": "gcloud logs tail --follow --service=restaurant-ai-assistant"
   },
   "dependencies": {
-    "@autonia/actors": "^0.1.25",
+    "@autonia/actors": "^0.1.26",
     "@autonia/auth": "^0.1.25",
     "@autonia/context-manager": "^0.1.25",
     "@autonia/core": "^0.1.25",
@@ -28,7 +35,7 @@
     "@autonia/thread-processors": "^0.1.25",
     "@autonia/tools": "^0.1.25",
     "@autonia/triggers": "^0.1.25",
-    "@autonia/types": "^0.1.25",
+    "@autonia/types": "0.1.27",
     "@autonia/upload-processors": "^0.1.25",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
@@ -41,6 +48,7 @@
   "devDependencies": {
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.10",
+    "@types/pg": "^8.15.5",
     "@types/react": "^19.1.9",
     "@typescript-eslint/eslint-plugin": "^8.21.0",
     "@typescript-eslint/parser": "^8.21.0",
@@ -54,7 +62,7 @@
     "typescript": "^5.7.3"
   },
   "engines": {
-    "node": ">=18",
+    "node": ">=20",
     "pnpm": ">=8",
     "npm": ">=9"
   },

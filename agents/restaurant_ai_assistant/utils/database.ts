@@ -2,7 +2,7 @@ import { Pool } from "pg";
 import dotenv from "dotenv";
 dotenv.config();
 
-const DB_URL = "postgresql://postgres.acpxtsugpnzazaybblug:!Restai7thpillar@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres";
+const DB_URL = "postgresql://postgres.fjozmcrqrevmxffayrhl:!Restai7thpillar@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres";
 
 // PostgreSQL connection configuration
 const db = new Pool({
