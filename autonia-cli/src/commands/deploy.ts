@@ -1,19 +1,19 @@
-import { Command } from "commander";
 import chalk from "chalk";
+import { Command } from "commander";
+import { existsSync } from "fs";
 import ora from "ora";
-import { existsSync, readFileSync } from "fs";
 import { resolve } from "path";
-import { buildProject, createDeploymentZip, uploadTobroker, pollDeploymentStatus } from "../utils/deployment.js";
-import { loadConfig, AUTONIA_DEFAULTS } from "../utils/config.js";
+import { AUTONIA_DEFAULTS, loadConfig } from "../utils/config.js";
+import { buildProject, createDeploymentZip, pollDeploymentStatus, uploadTobroker } from "../utils/deployment.js";
 
 export const deployCommand = new Command("deploy")
-  .description("Build and deploy your Autonia application")
+  .description("Build and deploy your Autonia Agent")
   .option("-s, --service <name>", "Override service name from config")
   .option("-t, --token <token>", "Bearer token for authentication")
   .option("--skip-build", "Skip build step (use existing dist/)", false)
   .option("-z, --zip <file>", "Use existing zip file instead of building")
   .action(async (options) => {
-    console.log(chalk.cyan("🚀 Starting deployment process...\n"));
+    console.log(chalk.cyan("🚀 Deploying Agent...\n"));
 
     // Load configuration
     const config = loadConfig();
@@ -27,7 +27,7 @@ export const deployCommand = new Command("deploy")
     const serviceName = options.service || config?.serviceName;
 
     if (!serviceName) {
-      console.error(chalk.red("❌ Service name is required."));
+      console.error(chalk.red("❌ Agent name is required."));
       console.log(chalk.yellow("💡 Run"), chalk.white("autonia init"), chalk.yellow("or use --service flag"));
       process.exit(1);
     }
@@ -39,10 +39,9 @@ export const deployCommand = new Command("deploy")
     const allowUnauthenticated = AUTONIA_DEFAULTS.allowUnauthenticated;
     const token = options.token;
 
-    console.log(chalk.gray("Deployment configuration:"));
-    console.log(chalk.gray(`  Service: ${serviceName}`));
+    console.log(chalk.gray("Agent configuration:"));
+    console.log(chalk.gray(`  Name: ${serviceName}`));
     console.log(chalk.gray(`  Region: ${region}`));
-    console.log(chalk.gray(`  Broker: ${brokerUrl}`));
     console.log(chalk.gray(`  Public Access: ${allowUnauthenticated ? "Enabled" : "Disabled"}`));
     console.log();
 
@@ -57,7 +56,7 @@ export const deployCommand = new Command("deploy")
         const buildSpinner = ora("Building project...").start();
         try {
           await buildProject();
-          buildSpinner.succeed(chalk.green("✅ Build completed"));
+          buildSpinner.succeed(chalk.green("✅ Agent Build completed"));
         } catch (error) {
           buildSpinner.fail(chalk.red("❌ Build failed"));
           console.error(error);
@@ -77,7 +76,7 @@ export const deployCommand = new Command("deploy")
       const zipSpinner = ora("Creating deployment package...").start();
       try {
         zipFile = await createDeploymentZip(serviceName || "app");
-        zipSpinner.succeed(chalk.green(`✅ Created ${zipFile}`));
+        zipSpinner.succeed(chalk.green(`✅ Agent Package created`));
       } catch (error) {
         zipSpinner.fail(chalk.red("❌ Failed to create deployment package"));
         console.error(error);
@@ -92,7 +91,7 @@ export const deployCommand = new Command("deploy")
     }
 
     // Upload to broker and poll for status
-    const uploadSpinner = ora("Uploading to Autonia Broker...").start();
+    const uploadSpinner = ora("Uploading to Autonia Cloud...").start();
     try {
       uploadSpinner.text = "Uploading...";
       const deployResponse = await uploadTobroker({
@@ -105,14 +104,14 @@ export const deployCommand = new Command("deploy")
         allowUnauthenticated,
       });
 
-      uploadSpinner.succeed(chalk.green("✅ Upload complete"));
+      uploadSpinner.succeed(chalk.green("✅ Uploaded to Autonia Cloud"));
 
       if (!deployResponse.operationId) {
         throw new Error("No operation ID received from broker");
       }
 
       // Poll for deployment status
-      const pollSpinner = ora("Deploying to Cloud Run...").start();
+      const pollSpinner = ora("Building...").start();
       let finalStatus: any;
       let attempts = 0;
       const maxAttempts = 120; // 10 minutes max (5 sec intervals)
@@ -123,7 +122,7 @@ export const deployCommand = new Command("deploy")
 
           // Update spinner text based on status
           if (status.status === "WORKING" || status.status === "QUEUED") {
-            pollSpinner.text = `Building... (${Math.floor((attempts * 5) / 60)}m ${(attempts * 5) % 60}s)`;
+            pollSpinner.text = `Preparing Agent... (${Math.floor((attempts * 5) / 60)}m ${(attempts * 5) % 60}s)`;
           } else if (status.status === "SUCCESS") {
             finalStatus = status;
             break;
@@ -153,7 +152,7 @@ export const deployCommand = new Command("deploy")
         throw new Error(finalStatus.error || "Deployment failed");
       }
 
-      pollSpinner.succeed(chalk.green("✅ Deployment completed successfully!"));
+      pollSpinner.succeed(chalk.green("✅ Agent ready!"));
 
       const response = finalStatus;
 
@@ -167,15 +166,15 @@ export const deployCommand = new Command("deploy")
         }
       }
 
-      // Display service URL prominently
+      // Display agent URL prominently
       console.log();
-      console.log(chalk.green.bold("🎉 Deployment Successful!"));
+      console.log(chalk.green.bold("🎉 Agent deployed successfully!"));
       console.log();
 
       if (response.url) {
         console.log(chalk.green.bold(response.url));
       } else {
-        console.log(chalk.yellow("Service deployed (URL not available yet)"));
+        console.log(chalk.yellow("Agent deployed (URL not available yet)"));
       }
 
       console.log();

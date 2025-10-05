@@ -10,7 +10,7 @@ interface AutoniaConfig {
 }
 
 export const initCommand = new Command("init")
-  .description("Initialize a new Autonia project configuration")
+  .description("Initialize a new Autonia Agent")
   .option("-s, --service-name <name>", "Service name")
   .option("-f, --force", "Overwrite existing config", false)
   .action(async (options) => {
@@ -32,7 +32,7 @@ export const initCommand = new Command("init")
       }
     }
 
-    console.log(chalk.cyan("🚀 Initializing Autonia project...\n"));
+    console.log(chalk.cyan("🚀 Initializing Autonia Agent...\n"));
 
     // Show embedded defaults
     console.log(chalk.gray("Using embedded configuration:"));
@@ -68,12 +68,12 @@ export const initCommand = new Command("init")
     // Write config file
     try {
       writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
-      console.log(chalk.green("\n✅ Configuration saved to autonia.config.json"));
-      console.log(chalk.blue("\nConfiguration:"));
-      console.log(chalk.gray(`  Service: ${serviceName}`));
+      console.log(chalk.green("\n✅ Configuration saved"));
+      console.log(chalk.blue("\nAgent:"));
+      console.log(chalk.gray(`  Name: ${serviceName}`));
       console.log(chalk.blue("\nNext steps:"));
-      console.log(chalk.gray("  1. Run"), chalk.white("autonia deploy"), chalk.gray("to deploy your application"));
-      console.log(chalk.gray("  2. Use"), chalk.white("autonia logs --follow"), chalk.gray("to monitor logs"));
+      console.log(chalk.gray("  1. Run"), chalk.white("autonia deploy"), chalk.gray("to deploy your Agent"));
+      console.log(chalk.gray("  2. Use"), chalk.white("autonia logs --follow"), chalk.gray("to view logs"));
     } catch (error) {
       console.error(chalk.red("❌ Failed to write config:"), error);
       process.exit(1);

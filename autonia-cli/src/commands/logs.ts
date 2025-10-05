@@ -5,7 +5,7 @@ import fetch from "node-fetch";
 import { loadConfig, AUTONIA_DEFAULTS } from "../utils/config.js";
 
 export const logsCommand = new Command("logs")
-  .description("Fetch logs for your deployed Autonia application")
+  .description("Fetch logs for your deployed Autonia Agent")
   .option("-s, --service <name>", "Service name (default: from config)")
   .option("-f, --follow", "Stream logs in real-time", false)
   .option("-n, --lines <count>", "Number of recent log lines to fetch", "50")
@@ -19,12 +19,12 @@ export const logsCommand = new Command("logs")
     const brokerUrl = AUTONIA_DEFAULTS.brokerUrl;
 
     if (!serviceName) {
-      console.error(chalk.red("❌ Service name not found."));
+      console.error(chalk.red("❌ Agent name not found."));
       console.log(chalk.yellow("💡 Specify with --service or run"), chalk.white("autonia init"));
       process.exit(1);
     }
 
-    console.log(chalk.cyan(`📋 Fetching logs for service: ${serviceName}\n`));
+    console.log(chalk.cyan(`📋 Fetching logs for Agent: ${serviceName}\n`));
 
     // Build query parameters
     const params = new URLSearchParams({
@@ -127,7 +127,7 @@ export const logsCommand = new Command("logs")
         spinner.stop();
 
         if (!data.logs || data.logs.length === 0) {
-          console.log(chalk.yellow("No logs found for this service."));
+          console.log(chalk.yellow("No logs found for this Agent."));
           return;
         }
 
