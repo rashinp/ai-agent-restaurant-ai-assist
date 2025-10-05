@@ -229,6 +229,86 @@ app.get("/status/:operationId", async (req, res) => {
   }
 });
 
+// Logs endpoint to fetch logs for a service
+app.get("/logs", async (req, res) => {
+  try {
+    const { service, region, lines = 50, filter: customFilter, follow } = req.query;
+
+    if (!service) {
+      return res.status(400).json({ error: "service is required" });
+    }
+
+    // Build filter for Cloud Run service
+    let filter = `resource.type="cloud_run_revision" AND resource.labels.service_name="${service}"`;
+
+    if (customFilter) {
+      filter += ` AND ${customFilter}`;
+    }
+
+    // Import Logging client
+    const { Logging } = await import("@google-cloud/logging");
+    const logging = new Logging({ projectId: PROJECT_ID });
+
+    if (follow === "true") {
+      // For streaming logs, use Server-Sent Events
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+
+      // Send initial connection message
+      res.write(`data: ${JSON.stringify({ type: "connected", message: "Streaming logs..." })}\n\n`);
+
+      // Poll for new logs every 5 seconds
+      const intervalId = setInterval(async () => {
+        try {
+          const entries = await logging.getEntries({
+            filter,
+            pageSize: 10,
+            orderBy: "timestamp desc",
+          });
+
+          if (entries && entries[0] && entries[0].length > 0) {
+            for (const entry of entries[0]) {
+              const logData = {
+                timestamp: entry.metadata.timestamp,
+                severity: entry.metadata.severity,
+                message: entry.data,
+              };
+              res.write(`data: ${JSON.stringify({ type: "log", data: logData })}\n\n`);
+            }
+          }
+        } catch (err) {
+          console.error("Error fetching logs:", err);
+        }
+      }, 5000);
+
+      // Clean up on connection close
+      req.on("close", () => {
+        clearInterval(intervalId);
+        res.end();
+      });
+    } else {
+      // For one-time fetch
+      const [entries] = await logging.getEntries({
+        filter,
+        pageSize: parseInt(lines),
+        orderBy: "timestamp desc",
+      });
+
+      const logs = entries.map((entry) => ({
+        timestamp: entry.metadata.timestamp,
+        severity: entry.metadata.severity,
+        message: entry.data,
+      }));
+
+      res.json({ logs });
+    }
+  } catch (err) {
+    console.error("Error fetching logs:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.listen(process.env.PORT || 8080, () => {
   console.log("Broker app running on port " + (process.env.PORT || 8080));
 });

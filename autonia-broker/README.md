@@ -104,6 +104,81 @@ curl -X POST https://broker-service-xxxxx.run.app/deploy \
   -F "allowUnauthenticated=true"
 ```
 
+### Status Endpoint
+
+**GET** `/status/:operationId`
+
+Check deployment progress.
+
+**Query Parameters:**
+
+- `service` (string) - Service name
+- `region` (string) - GCP region
+
+**Response:**
+
+```json
+{
+  "operationId": "build-id-123",
+  "status": "SUCCESS",
+  "logUrl": "https://console.cloud.google.com/cloud-build/...",
+  "service": "my-app",
+  "region": "asia-south1",
+  "url": "https://my-app-xxxxx.run.app",
+  "message": "Deployment successful"
+}
+```
+
+**Status Values:** `QUEUED`, `WORKING`, `SUCCESS`, `FAILURE`, `TIMEOUT`, `CANCELLED`
+
+### Logs Endpoint
+
+**GET** `/logs`
+
+Fetch logs for a deployed service.
+
+**Query Parameters:**
+
+- `service` (required, string) - Service name
+- `region` (optional, string) - GCP region
+- `lines` (optional, number) - Number of log lines (default: 50)
+- `filter` (optional, string) - Additional log filter expression
+- `follow` (optional, string) - Set to "true" for streaming logs (Server-Sent Events)
+
+**Response (one-time fetch):**
+
+```json
+{
+  "logs": [
+    {
+      "timestamp": "2025-10-05T10:30:00Z",
+      "severity": "INFO",
+      "message": "Server started on port 3000"
+    }
+  ]
+}
+```
+
+**Response (streaming with follow=true):**
+
+Server-Sent Events format:
+
+```
+data: {"type":"connected","message":"Streaming logs..."}
+
+data: {"type":"log","data":{"timestamp":"...","severity":"INFO","message":"..."}}
+```
+
+**Example:**
+
+```bash
+# Fetch recent logs
+curl "https://broker-service-xxxxx.run.app/logs?service=my-app&lines=100"
+
+# Stream logs (SSE)
+curl "https://broker-service-xxxxx.run.app/logs?service=my-app&follow=true"
+```
+
 ## How It Works
 
 1. Receives deployment package (zip)
@@ -216,6 +291,14 @@ gcloud artifacts repositories create app-images \
 - `package.json` - Dependencies
 - `IAM-FIX.md` - IAM policy troubleshooting guide
 
+## API Endpoints Summary
+
+| Method | Endpoint               | Purpose                       |
+| ------ | ---------------------- | ----------------------------- |
+| POST   | `/deploy`              | Deploy a service to Cloud Run |
+| GET    | `/status/:operationId` | Check deployment status       |
+| GET    | `/logs`                | Fetch or stream service logs  |
+
 ## Dependencies
 
 - `express` - Web server
@@ -223,6 +306,7 @@ gcloud artifacts repositories create app-images \
 - `@google-cloud/storage` - GCS operations
 - `@google-cloud/cloudbuild` - Cloud Build API
 - `@google-cloud/run` - Cloud Run API (for fetching URLs)
+- `@google-cloud/logging` - Cloud Logging API (for fetching logs)
 - `adm-zip` - Zip file parsing
 - `dotenv` - Environment variables
 

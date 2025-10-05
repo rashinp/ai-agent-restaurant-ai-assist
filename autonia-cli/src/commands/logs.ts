@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import ora from "ora";
-import { spawn } from "child_process";
+import fetch from "node-fetch";
 import { loadConfig, AUTONIA_DEFAULTS } from "../utils/config.js";
 
 export const logsCommand = new Command("logs")
@@ -10,11 +10,13 @@ export const logsCommand = new Command("logs")
   .option("-f, --follow", "Stream logs in real-time", false)
   .option("-n, --lines <count>", "Number of recent log lines to fetch", "50")
   .option("--filter <filter>", "Custom log filter expression")
+  .option("-t, --token <token>", "Bearer token for authentication")
   .action(async (options) => {
     const config = loadConfig();
 
     const serviceName = options.service || config?.serviceName;
-    const projectId = AUTONIA_DEFAULTS.projectId;
+    const region = AUTONIA_DEFAULTS.region;
+    const brokerUrl = AUTONIA_DEFAULTS.brokerUrl;
 
     if (!serviceName) {
       console.error(chalk.red("❌ Service name not found."));
@@ -22,113 +24,140 @@ export const logsCommand = new Command("logs")
       process.exit(1);
     }
 
-    // Check if gcloud CLI is installed
-    const gcloudCheck = spawn("which", ["gcloud"], { shell: true });
-
-    await new Promise((resolve) => {
-      gcloudCheck.on("close", (code) => {
-        if (code !== 0) {
-          console.error(chalk.red("❌ gcloud CLI is not installed or not in PATH."));
-          console.log(chalk.yellow("💡 Install it from: https://cloud.google.com/sdk/docs/install"));
-          process.exit(1);
-        }
-        resolve(null);
-      });
-    });
-
     console.log(chalk.cyan(`📋 Fetching logs for service: ${serviceName}\n`));
 
-    // Build gcloud command
-    const args = ["logs"];
-
-    if (options.follow) {
-      args.push("tail", "--follow");
-    } else {
-      args.push("read");
-      args.push(`--limit=${options.lines}`);
-    }
-
-    args.push(`--service=${serviceName}`);
-
-    if (projectId) {
-      args.push(`--project=${projectId}`);
-    }
+    // Build query parameters
+    const params = new URLSearchParams({
+      service: serviceName,
+      region,
+      lines: options.lines,
+    });
 
     if (options.filter) {
-      args.push(`--filter=${options.filter}`);
+      params.append("filter", options.filter);
     }
 
-    // Add format for better readability
-    args.push("--format=json");
+    if (options.follow) {
+      params.append("follow", "true");
+    }
 
-    const spinner = ora("Loading logs...").start();
+    const url = `${brokerUrl.replace(/\/$/, "")}/logs?${params.toString()}`;
+    const headers: any = {};
 
-    // Execute gcloud logs command
-    const logsProcess = spawn("gcloud", args, {
-      stdio: ["inherit", "pipe", "pipe"],
-      shell: true,
-    });
+    if (options.token) {
+      headers["Authorization"] = `Bearer ${options.token}`;
+    }
 
-    let hasLogs = false;
-    let buffer = "";
+    try {
+      if (options.follow) {
+        // Handle Server-Sent Events for streaming
+        const spinner = ora("Connecting to log stream...").start();
+        const response = await fetch(url, { headers });
 
-    logsProcess.stdout.on("data", (data) => {
-      if (!hasLogs) {
-        spinner.stop();
-        hasLogs = true;
-        if (!options.follow) {
-          console.log(chalk.cyan("📋 Recent logs:\n"));
+        if (!response.ok) {
+          spinner.fail(chalk.red("❌ Failed to connect to log stream"));
+          const error = await response.text();
+          console.error(chalk.red(error));
+          process.exit(1);
         }
-      }
 
-      buffer += data.toString();
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
+        if (!response.body) {
+          spinner.fail(chalk.red("❌ No response body"));
+          process.exit(1);
+        }
 
-      for (const line of lines) {
-        if (line.trim()) {
-          try {
-            const log = JSON.parse(line);
-            formatLogEntry(log);
-          } catch {
-            // If not JSON, just print the line
-            console.log(line);
+        spinner.succeed(chalk.green("✅ Connected to log stream"));
+        console.log(chalk.cyan("📋 Streaming logs:\n"));
+
+        let buffer = "";
+
+        // node-fetch v3 uses Node.js streams
+        const body = response.body as any;
+
+        body.on("data", (chunk: Buffer) => {
+          buffer += chunk.toString();
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.type === "log") {
+                  formatLogEntry(data.data);
+                } else if (data.type === "connected") {
+                  // Initial connection message
+                }
+              } catch (err) {
+                // Ignore parsing errors
+              }
+            }
           }
+        });
+
+        body.on("error", (err: Error) => {
+          console.error(chalk.red("❌ Stream error:"), err.message);
+          process.exit(1);
+        });
+
+        body.on("end", () => {
+          console.log(chalk.yellow("\n\n👋 Stream ended."));
+          process.exit(0);
+        });
+
+        // Handle Ctrl+C gracefully
+        process.on("SIGINT", () => {
+          body.destroy();
+          console.log(chalk.yellow("\n\n👋 Stopped following logs."));
+          process.exit(0);
+        });
+      } else {
+        // One-time fetch
+        const spinner = ora("Loading logs...").start();
+        const response = await fetch(url, { headers });
+
+        if (!response.ok) {
+          spinner.fail(chalk.red("❌ Failed to fetch logs"));
+          const error = await response.text();
+          console.error(chalk.red(error));
+          process.exit(1);
+        }
+
+        const data: any = await response.json();
+        spinner.stop();
+
+        if (!data.logs || data.logs.length === 0) {
+          console.log(chalk.yellow("No logs found for this service."));
+          return;
+        }
+
+        console.log(chalk.cyan("📋 Recent logs:\n"));
+        // Display in reverse order (oldest first)
+        for (const log of data.logs.reverse()) {
+          formatLogEntry(log);
         }
       }
-    });
-
-    logsProcess.stderr.on("data", (data) => {
-      const error = data.toString();
-      if (!error.includes("Listed 0 items")) {
-        spinner.fail();
-        console.error(chalk.red(error));
-      }
-    });
-
-    logsProcess.on("close", (code) => {
-      if (code === 0 && !hasLogs) {
-        spinner.succeed(chalk.yellow("No logs found for this service."));
-      } else if (code !== 0 && code !== null) {
-        spinner.fail(chalk.red(`Logs command exited with code ${code}`));
-        process.exit(code);
-      } else {
-        spinner.stop();
-      }
-    });
-
-    // Handle Ctrl+C gracefully
-    process.on("SIGINT", () => {
-      logsProcess.kill("SIGINT");
-      console.log(chalk.yellow("\n\n👋 Stopped following logs."));
-      process.exit(0);
-    });
+    } catch (error: any) {
+      console.error(chalk.red("❌ Error fetching logs:"), error.message);
+      process.exit(1);
+    }
   });
 
 function formatLogEntry(log: any) {
-  const timestamp = log.timestamp || log.receiveTimestamp || "";
+  const timestamp = log.timestamp || "";
   const severity = log.severity || "INFO";
-  const message = log.textPayload || log.jsonPayload?.message || JSON.stringify(log.jsonPayload || {});
+
+  // Handle different message formats from broker
+  let message = "";
+  if (typeof log.message === "string") {
+    message = log.message;
+  } else if (log.message?.textPayload) {
+    message = log.message.textPayload;
+  } else if (log.message?.jsonPayload) {
+    message = JSON.stringify(log.message.jsonPayload);
+  } else if (typeof log.message === "object") {
+    message = JSON.stringify(log.message);
+  }
 
   // Color code by severity
   let severityColor = chalk.gray;

@@ -7,7 +7,7 @@ import { logsCommand } from "./commands/logs.js";
 
 const program = new Command();
 
-program.name("autonia").description("CLI tool for deploying and managing Autonia applications").version("0.1.3");
+program.name("autonia").description("CLI tool for deploying and managing Autonia applications").version("0.1.4");
 
 // Register commands
 program.addCommand(initCommand);
