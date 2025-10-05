@@ -1,0 +1,1 @@
+gcloud run deploy broker-service --region asia-south1 --platform managed --source . --allow-unauthenticated --set-env-vars DEPLOY_BUCKET=autonia-bucket,PROJECT_ID=protean-acrobat-458913-n8

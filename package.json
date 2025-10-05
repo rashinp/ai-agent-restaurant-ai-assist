@@ -16,6 +16,10 @@
     "deploy:help": "./deploy.sh --help",
     "deploy:cloudbuild": "./deploy-cloudbuild.sh",
     "deploy:docker": "./deploy.sh --project-id protean-acrobat-458913-n8",
+    "deploy:autonia": "autonia deploy --appname restaurant-ai-assistant",
+    "autonia:init": "autonia init --project-id protean-acrobat-458913-n8",
+    "broker:deploy": "cd autonia-broker && npm run build && ./deploy-broker.sh",
+    "cli:install": "cd autonia-cli && npm install && npm run build && npm link",
     "gcp:logs": "gcloud logs tail --follow --service=restaurant-ai-assistant"
   },
   "dependencies": {

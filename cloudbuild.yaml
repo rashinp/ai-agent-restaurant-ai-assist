@@ -5,10 +5,7 @@ steps:
       - "DOCKER_BUILDKIT=1"
     args:
       - "build"
-      - "--cache-from"
-      - "gcr.io/$PROJECT_ID/ai-restaurant-assistant:latest"
-      - "--build-arg"
-      - "BUILDKIT_INLINE_CACHE=1"
+      - "--no-cache"
       - "-t"
       - "gcr.io/$PROJECT_ID/ai-restaurant-assistant:$BUILD_ID"
       - "-t"
@@ -34,7 +31,7 @@ steps:
       - "deploy"
       - "ai-restaurant-assistant"
       - "--image"
-      - "gcr.io/$PROJECT_ID/ai-restaurant-assistant:latest"
+      - "gcr.io/$PROJECT_ID/ai-restaurant-assistant:$BUILD_ID"
       - "--region"
       - "us-central1"
       - "--platform"
@@ -54,8 +51,8 @@ steps:
       - "0"
       - "--max-instances"
       - "10"
-      - "--env-vars-file"
-      - ".env.yaml"
+      - "--set-env-vars"
+      - "NODE_ENV=production"
 
 # Store images in Container Registry
 images:

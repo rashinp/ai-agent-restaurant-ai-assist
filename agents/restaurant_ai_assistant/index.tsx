@@ -159,6 +159,7 @@ const fetchSchemaTool = async () => {
 
 const RestaurantAIAssistant = async () => {
   const schemaInfo = await fetchSchemaTool();
+  console.log("Starting Restaurant AI Assistant");
 
   return (
     <Workflow
@@ -301,6 +302,11 @@ const RestaurantAIAssistant = async () => {
           
           Analyze the user query and determine which tables are needed to fetch the required data from the database.
           Return the table names in the expected JSON format.
+
+          Try to find names/labels instead of IDs in the database tables. 
+          For example, instead of using location_id, use location_name.
+          
+          
         `;
           }}
         </Prompt>
@@ -343,6 +349,9 @@ const RestaurantAIAssistant = async () => {
           
           Based on the table schema and user query, call the execute-sql tool to get results for the user query.
           Make sure your SQL query is syntactically correct and uses only existing columns.
+
+          Try to find names/labels instead of IDs in the database tables. 
+          For example, instead of using location_id, use location_name.
           
         `;
           }}
@@ -357,7 +366,7 @@ const RestaurantAIAssistant = async () => {
         expectedOutput={z.object({
           sections: z.array(
             z.object({
-              type: z.enum(["text", "table", "chart", "cards", "card"]),
+              type: z.enum(["text", "table", "chart", "cards", "card", "highlight"]),
               data: z.union([
                 // TableData
                 z
@@ -366,6 +375,17 @@ const RestaurantAIAssistant = async () => {
                     rows: z.array(z.array(z.union([z.string(), z.number()]))),
                   })
                   .describe("Table data"),
+
+                // HighlightData
+                z
+                  .object({
+                    text: z.string(),
+                    title: z.string().nullable(),
+                    type: z.enum(["normal", "warning", "critical", "error", "success", "info"]),
+                    color: z.string().nullable(),
+                    icon: z.string().nullable(),
+                  })
+                  .describe("Highlight data"),
 
                 // ChartData
                 z
@@ -443,6 +463,9 @@ const RestaurantAIAssistant = async () => {
           Make your response conversational and helpful, as if you're a restaurant consultant explaining the data to the restaurant owner.
 
           Do not make up any data or make any assumptions.
+
+          Try to find names/labels instead of IDs in the database tables. 
+          For example, instead of using location_id, use location_name.
         `}
         </Prompt>
       </Agent>
