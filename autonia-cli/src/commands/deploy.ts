@@ -5,6 +5,7 @@ import ora from "ora";
 import { resolve } from "path";
 import { AUTONIA_DEFAULTS, loadConfig } from "../utils/config.js";
 import { buildProject, createDeploymentZip, pollDeploymentStatus, uploadTobroker } from "../utils/deployment.js";
+import { getToken, verifyToken, refreshToken } from "../utils/auth.js";
 
 export const deployCommand = new Command("deploy")
   .description("Build and deploy your Autonia Agent")
@@ -32,12 +33,34 @@ export const deployCommand = new Command("deploy")
       process.exit(1);
     }
 
+    // Get authentication token
+    let token = options.token || getToken();
+
+    // Check if user is authenticated
+    if (!token) {
+      console.error(chalk.red("❌ Not authenticated"));
+      console.log(chalk.yellow("💡 Run"), chalk.white("autonia login"), chalk.yellow("to authenticate"));
+      process.exit(1);
+    }
+
+    // Verify token is valid
+    const isValid = await verifyToken();
+    if (!isValid) {
+      console.log(chalk.yellow("⚠️  Token expired, refreshing..."));
+      token = await refreshToken();
+
+      if (!token) {
+        console.error(chalk.red("❌ Session expired. Please log in again"));
+        console.log(chalk.yellow("💡 Run"), chalk.white("autonia login"), chalk.yellow("to authenticate"));
+        process.exit(1);
+      }
+    }
+
     // Use embedded defaults
     const region = AUTONIA_DEFAULTS.region;
     const brokerUrl = AUTONIA_DEFAULTS.brokerUrl;
     const repo = AUTONIA_DEFAULTS.repo;
     const allowUnauthenticated = AUTONIA_DEFAULTS.allowUnauthenticated;
-    const token = options.token;
 
     console.log(chalk.gray("Agent configuration:"));
     console.log(chalk.gray(`  Name: ${serviceName}`));

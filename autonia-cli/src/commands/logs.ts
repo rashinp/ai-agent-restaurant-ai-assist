@@ -3,6 +3,7 @@ import chalk from "chalk";
 import ora from "ora";
 import fetch from "node-fetch";
 import { loadConfig, AUTONIA_DEFAULTS } from "../utils/config.js";
+import { getToken } from "../utils/auth.js";
 
 export const logsCommand = new Command("logs")
   .description("Fetch logs for your deployed Autonia Agent")
@@ -42,10 +43,11 @@ export const logsCommand = new Command("logs")
     }
 
     const url = `${brokerUrl.replace(/\/$/, "")}/logs?${params.toString()}`;
+    const token = options.token || getToken();
     const headers: any = {};
 
-    if (options.token) {
-      headers["Authorization"] = `Bearer ${options.token}`;
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
     }
 
     try {

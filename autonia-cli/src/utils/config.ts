@@ -19,6 +19,9 @@ export const AUTONIA_DEFAULTS = {
   maxInstances: 10,
   port: 3000,
   allowUnauthenticated: true, // Make services public by default
+  supabaseUrl: "https://xqvmmvdmsibkchcvyocp.supabase.co", // Will be configured during setup
+  supabaseAnonKey:
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhxdm1tdmRtc2lia2NoY3Z5b2NwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk2NjY5MjQsImV4cCI6MjA3NTI0MjkyNH0.zelGdDqRoSaCldhk4wFd53g0pQ5DtwkskCzdqVf_C_I",
 } as const;
 
 export function loadConfig(): AutoniaConfig | null {

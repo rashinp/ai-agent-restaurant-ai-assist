@@ -5,8 +5,13 @@ import { Storage } from "@google-cloud/storage";
 import { CloudBuildClient } from "@google-cloud/cloudbuild";
 import AdmZip from "adm-zip"; // unzip in-memory
 import dotenv from "dotenv";
+import { authenticateUser, recordDeployment, getUserDeployments } from "./supabase.js";
+import { getAuthPage, getSuccessPage } from "./auth-page.js";
+
+dotenv.config();
 
 const app = express();
+app.use(express.json());
 const upload = multer({ storage: multer.memoryStorage() });
 
 const storage = new Storage();
@@ -29,8 +34,8 @@ function extractEnvFromZip(buffer) {
   }
 }
 
-// Deploy endpoint
-app.post("/deploy", upload.single("source"), async (req, res) => {
+// Deploy endpoint (protected with auth)
+app.post("/deploy", authenticateUser, upload.single("source"), async (req, res) => {
   try {
     const {
       service = "my-service",
@@ -158,6 +163,18 @@ EOF
     const initialBuild = operation.metadata.build;
     const buildId = initialBuild.id;
 
+    // Record deployment in Supabase
+    await recordDeployment({
+      userId: req.user.id,
+      userEmail: req.user.email,
+      serviceName: service,
+      region,
+      status: "building",
+      operationId: buildId,
+      logUrl: initialBuild.logUrl,
+      publicAccess: isPublic,
+    });
+
     // Return immediately with operation ID
     res.json({
       message: "Deployment started",
@@ -211,6 +228,10 @@ app.get("/status/:operationId", async (req, res) => {
 
         response.url = serviceInfo.uri;
         response.message = "Deployment successful";
+
+        // Update deployment record in Supabase
+        const { updateDeploymentStatus } = await import("./supabase.js");
+        await updateDeploymentStatus(operationId, "success", serviceInfo.uri);
       } catch (err) {
         console.error("Failed to fetch service URL:", err);
         // Continue without URL
@@ -218,6 +239,10 @@ app.get("/status/:operationId", async (req, res) => {
     } else if (status === "FAILURE" || status === "TIMEOUT" || status === "CANCELLED") {
       response.message = "Deployment failed";
       response.error = `Build ${status.toLowerCase()}`;
+
+      // Update deployment record in Supabase
+      const { updateDeploymentStatus } = await import("./supabase.js");
+      await updateDeploymentStatus(operationId, "failed");
     } else {
       response.message = "Deployment in progress";
     }
@@ -307,6 +332,123 @@ app.get("/logs", async (req, res) => {
     console.error("Error fetching logs:", err);
     res.status(500).json({ error: err.message });
   }
+});
+
+// Get user's deployments (protected)
+app.get("/deployments", authenticateUser, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 50;
+    const deployments = await getUserDeployments(req.user.id, limit);
+
+    res.json({ deployments });
+  } catch (err) {
+    console.error("Error fetching deployments:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Authentication page endpoint
+app.get("/auth/login", (req, res) => {
+  res.send(getAuthPage());
+});
+
+// Login API endpoint
+app.post("/auth/api/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required" });
+    }
+
+    const { supabase } = await import("./supabase.js");
+
+    if (!supabase) {
+      return res.status(503).json({ error: "Authentication service not configured" });
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      return res.status(401).json({ error: error.message });
+    }
+
+    if (!data.session || !data.user) {
+      return res.status(401).json({ error: "Authentication failed" });
+    }
+
+    // Return tokens
+    res.json({
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+      user: {
+        id: data.user.id,
+        email: data.user.email,
+      },
+    });
+  } catch (err) {
+    console.error("Login error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Signup API endpoint
+app.post("/auth/api/signup", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required" });
+    }
+
+    const { supabase } = await import("./supabase.js");
+
+    if (!supabase) {
+      return res.status(503).json({ error: "Authentication service not configured" });
+    }
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    if (error) {
+      return res.status(400).json({ error: error.message });
+    }
+
+    if (data.session) {
+      // Auto-login after signup (email confirmation disabled)
+      res.json({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+        user: {
+          id: data.user.id,
+          email: data.user.email,
+        },
+      });
+    } else {
+      // Email confirmation required
+      res.json({
+        message: "Account created! Please check your email to confirm your account.",
+        confirmation_required: true,
+        user: {
+          id: data.user.id,
+          email: data.user.email,
+        },
+      });
+    }
+  } catch (err) {
+    console.error("Signup error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", service: "autonia-broker" });
 });
 
 app.listen(process.env.PORT || 8080, () => {
